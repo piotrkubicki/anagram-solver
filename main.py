@@ -2,6 +2,9 @@ from hashlib import md5
 from collections import Counter
 from itertools import permutations, combinations
 
+import threading
+
+
 def test_easy_secret(phrase):
     hashed_phrase = hash(phrase) 
     return hashed_phrase == "e4820b45d2277f3844eac66c903e84be"
@@ -53,37 +56,59 @@ def get_valid_words(valid_chars, words_path):
 
 
 def find_permutation(words, perm_lenght, req_length, anagram):
-    print(f"Permutation of length {perm_lenght}")
     for perm in combinations(words, perm_lenght):
         if len("".join(perm)) == req_length:
             yield perm
 
 
-if __name__ == "__main__":
-    valid_chars = sorted("poultry outwits ants".replace(" ", ""))
-    valid_words_list = sorted(set(get_valid_words(valid_chars, "wordlist")), key=len)
-    found = False
-    max_length = 4
+def find_secret(words, perm_length, secret_len, anagram, secrets):
+    print(f"Anagram search of lenght {perm_length} started!")
 
-    done = [False, False, False]
-    for i in range(max_length + 1):
-        for comb in find_permutation(valid_words_list, i, 18, "poultry outwits ants"):
-            if is_character_count_fine("".join(comb), "poultryoutwitsants"):
-                for perm in permutations(comb):
-                    secret = " ".join(perm)
-                    if test_easy_secret(secret):
-                        print(f"Easy secret found --> {secret}")
-                        done[0] == True
-                    if test_medium_secret(secret):
-                        print(f"Medium secret found --> {secret}")
-                        done[1] = True
-                    if test_hard_secret(secret):
-                        print(f"Hard secret found --> {secret}")
-                        done[2] = True
+    for comb in find_permutation(words, perm_length, secret_len, anagram):
+        if is_character_count_fine("".join(comb), anagram):
+            for perm in permutations(comb):
+                secret = " ".join(perm)
+                if test_easy_secret(secret):
+                    print(f"Easy secret found --> {secret}")
+                    secrets["easy"] = secret
+                if test_medium_secret(secret):
+                    print(f"Medium secret found --> {secret}")
+                    secrets["medium"] = secret
+                if test_hard_secret(secret):
+                    print(f"Hard secret found --> {secret}")
+                    secrets["hard"] = secret
             
-            if done[0] and done[1] and done[2]:
-                break
-        if done[0] and done[1] and done[2]:
+                if len(secrets) == 1:
+                    break
+        if len(secrets) == 1:
             break
 
-    print("Finished")
+    print(f"Checking permutation of length {perm_length} completed!")
+
+
+if __name__ == "__main__":
+    max_length = 4
+    anagram = "poultry outwits ants".replace(" ", "")
+    anagram_length = len(anagram)
+    secrets = {}
+    threads = []
+    
+    valid_chars = sorted(anagram)
+    valid_words_list = sorted(
+        get_valid_words(valid_chars, "wordlist"),
+        key=len
+    )
+
+    for i in range(1, max_length + 1):
+        threads.append(
+            threading.Thread(target=find_secret, args=(valid_words_list, i, anagram_length, anagram, secrets))
+        )
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    print("Search complete. Following secrets found:")
+    for key, value in secrets.items():
+        print(f"{key} --> {value}")
+
