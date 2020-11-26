@@ -2,8 +2,7 @@ from hashlib import md5
 from collections import Counter
 from itertools import permutations, combinations, combinations_with_replacement
 from typing import List, Dict, Generator
-
-import threading
+from concurrent.futures import ThreadPoolExecutor
 
 
 hashed_secrets = {
@@ -69,6 +68,9 @@ def find_words_lengths(num_words: int, min_chars: int, max_chars: int, limit: in
 
 
 def find_secret(words: List[str], words_len_comb: List[int], comb_length: int, secret_len: int, anagram: str, secrets: Dict[str, str], secrets_req: int) -> None:
+    if len(secrets) == secrets_req:
+        return
+        
     selected_words = [word for word in words if len(word) in words_len_comb]
     print(f"Anagram search with comb {words_len_comb} started! Words count: {len(selected_words)}")
     
@@ -108,20 +110,16 @@ if __name__ == "__main__":
         key=len
     )
 
-    for i in range(max_length):
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for i in range(max_length):            
 
-        words_len_comb = find_words_lengths(i+1, 2, anagram_length, anagram_length)
+            words_len_comb = find_words_lengths(i+1, 2, anagram_length, anagram_length)
 
-        for comb in words_len_comb:
-            threads.append(
-                threading.Thread(target=find_secret, args=(valid_words_list, comb, i+1, anagram_length, anagram, secrets, 3))
-            )
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
+            for comb in words_len_comb:
+                threads.append(
+                    executor.submit(find_secret, valid_words_list, comb, i+1, anagram_length, anagram, secrets, 3)
+                )
 
     print("Search complete. Following secrets found:")
     for key, value in secrets.items():
         print(f"{key} --> {value}")   
-
