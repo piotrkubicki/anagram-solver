@@ -37,13 +37,18 @@ def test_is_character_count_fine(tested, searched, expected):
     assert is_character_count_fine(tested, searched) == expected
 
 
-@pytest.mark.parametrize("words,word_count,char_count,expected", [
-   (["s", "m", "l", "xl", "xxl"], 3, 3, [("s", "m", "l")]),
-   (["s", "m", "l", "xl", "xxl"], 3, 4, [("s", "m", "xl"), ("m", "l", "xl"), ("s", "l", "xl")]),
-   (["s", "m", "l", "xl", "xxl"], 3, 5, [("s", "m", "xxl"), ("m", "l", "xxl"), ("s", "l", "xxl")]),
+@pytest.mark.parametrize("words,word_count,expected", [
+   (["s", "m", "l", "xl", "xxl"], [1, 2, 3], [("s", "xl", "xxl"), ("m", "xl", "xxl"), ("l", "xl", "xxl")]),
+   (["s", "m", "l", "xl", "xxl"], [1, 2, 1], [
+            ("s", "xl", "s"), ("s", "xl", "m"), ("s", "xl", "l"),
+            ("m", "xl", "s"), ("m", "xl", "m"), ("m", "xl", "l"),
+            ("l", "xl", "s"), ("l", "xl", "m"), ("l", "xl", "l"),            
+       ]
+    ),
+   (["s", "m", "xl", "xxl"], [1, 3], [("s", "xxl"), ("m", "xxl")]),
 ])
-def test_find_combination(words, word_count, char_count, expected):
-    assert set(find_combination(words, word_count, char_count)) == set(expected)
+def test_find_combination(words, word_count, expected):
+    assert set(find_combination(words, word_count)) == set(expected)
 
 
 @pytest.mark.parametrize("num_words,min_chars,max_chars,limit,expected", [
