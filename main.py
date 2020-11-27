@@ -1,32 +1,36 @@
 from hashlib import md5
-from collections import Counter
-from itertools import permutations, combinations
-
-def test_easy_secret(phrase):
-    hashed_phrase = hash(phrase) 
-    return hashed_phrase == "e4820b45d2277f3844eac66c903e84be"
+from collections import Counter, defaultdict
+from itertools import permutations, combinations_with_replacement, product
+from typing import List, Dict, Generator
+from concurrent.futures import ThreadPoolExecutor
 
 
-def test_medium_secret(phrase):
-    hashed_phrase = hash(phrase) 
-    return hashed_phrase == "23170acc097c24edb98fc5488ab033fe"
+hashed_secrets = {
+    "easy": "e4820b45d2277f3844eac66c903e84be",
+    "medium": "23170acc097c24edb98fc5488ab033fe",
+    "hard": "665e5bcb0c20062fe8abaaf4628bb154",
+}
 
 
-def test_hard_secret(phrase):
-    hashed_phrase = hash(phrase) 
-    return hashed_phrase == "665e5bcb0c20062fe8abaaf4628bb154"
+def get_hashed_secret(difficulty: str) -> str:
+    return hashed_secrets.get(difficulty, "")
 
 
-def hash(phrase):
+def test_secret(phrase: str, difficulty: str) -> bool:
+    hashed_phrase = hash_word(phrase) 
+    return hashed_phrase == get_hashed_secret(difficulty)
+
+
+def hash_word(phrase: str) -> str:
     return md5(phrase.encode()).hexdigest()
 
 
-def read_words(path):
+def read_words(path: str) -> Generator:
     return (line.rstrip("\n") for line in open(path))
 
 
-def is_valid_word(valid_chars, word):
-    if "'" in word or len(word) < 2:
+def is_valid_word(valid_chars: List[str], min_word_len: int, word: List[str]) -> bool:
+    if len(word) < min_word_len:
         return False
     valid_chars = list(valid_chars)
     for char in list(word):
@@ -37,7 +41,7 @@ def is_valid_word(valid_chars, word):
     return True
 
 
-def is_character_count_fine(tested, searched):
+def is_character_count_fine(tested: str, searched: str) -> bool:
     tested_counter = Counter(tested)
     searched_counter = Counter(searched)
 
@@ -48,42 +52,86 @@ def is_character_count_fine(tested, searched):
     return True
 
 
-def get_valid_words(valid_chars, words_path):
-    return (word for word in read_words(words_path) if is_valid_word(valid_chars, word))
+def get_valid_words(valid_chars: List[str], min_word_len: int, words_path: str) -> Generator:
+    return (word for word in read_words(words_path) if is_valid_word(valid_chars, min_word_len, word))
 
 
-def find_permutation(words, perm_lenght, req_length, anagram):
-    print(f"Permutation of length {perm_lenght}")
-    for perm in combinations(words, perm_lenght):
-        if len("".join(perm)) == req_length:
-            yield perm
+def find_combination(words: List[str], words_len_comb: List[int]) -> List[str]:
+    words_by_len = defaultdict(list)
+    for word in words:
+        words_by_len[len(word)].append(word)
+
+    values = []
+    for comb_len in words_len_comb:
+        values.append(words_by_len[comb_len])
+    for comb in product(*values):
+        yield comb         
+
+
+def find_words_lengths(num_words: int, min_chars: int, max_chars: int, limit: int) -> List[List[int]]:
+    combs = [c for c in combinations_with_replacement(list(range(min_chars, max_chars - min_chars)), num_words) if sum(c) == limit]
+    return combs
+
+
+def shout_secret_found(secret: str, difficulty: str) -> None:
+    print("-" * 50)
+    print(f"{difficulty} secret found --> {secret}!!!")
+    print("-" * 50)
+
+def find_secret(words: List[str], words_len_comb: List[int], comb_length: int, secret_len: int, anagram: str, secrets: Dict[str, str], secrets_req: int) -> None:
+    if len(secrets) == secrets_req:
+        return
+        
+    selected_words = [word for word in words if len(word) in words_len_comb]
+    print(f"Anagram search with comb {words_len_comb} started! Words count: {len(selected_words)}")
+    
+    for comb in find_combination(selected_words, words_len_comb):
+        if is_character_count_fine("".join(comb), anagram):
+            for perm in permutations(comb):
+                secret = " ".join(perm)
+                if secrets.get("easy", "") == "" and test_secret(secret, "easy"):
+                    shout_secret_found(secret, "Easy")
+                    secrets["easy"] = secret
+                if secrets.get("medium", "") == "" and test_secret(secret, "medium"):
+                    shout_secret_found(secret, "Medium")
+                    secrets["medium"] = secret
+                if secrets.get("hard", "") == "" and test_secret(secret, "hard"):
+                    shout_secret_found(secret, "Hard")
+                    secrets["hard"] = secret
+            
+                if len(secrets) == secrets_req:
+                    break
+        if len(secrets) == secrets_req:
+            break
+
+    print(f"Checking permutation for comb {words_len_comb} completed!")
 
 
 if __name__ == "__main__":
-    valid_chars = sorted("poultry outwits ants".replace(" ", ""))
-    valid_words_list = sorted(set(get_valid_words(valid_chars, "wordlist")), key=len)
-    found = False
     max_length = 4
+    min_word_len = 2
+    anagram = "poultry outwits ants".replace(" ", "")
+    anagram_length = len(anagram)
+    secrets = {}
+    threads = []
+    
+    valid_chars = sorted(anagram)
+    valid_words_list = sorted(
+        get_valid_words(valid_chars, min_word_len, "wordlist"),
+        key=len
+    )
 
-    done = [False, False, False]
-    for i in range(max_length + 1):
-        for comb in find_permutation(valid_words_list, i, 18, "poultry outwits ants"):
-            if is_character_count_fine("".join(comb), "poultryoutwitsants"):
-                for perm in permutations(comb):
-                    secret = " ".join(perm)
-                    if test_easy_secret(secret):
-                        print(f"Easy secret found --> {secret}")
-                        done[0] == True
-                    if test_medium_secret(secret):
-                        print(f"Medium secret found --> {secret}")
-                        done[1] = True
-                    if test_hard_secret(secret):
-                        print(f"Hard secret found --> {secret}")
-                        done[2] = True
-            
-            if done[0] and done[1] and done[2]:
-                break
-        if done[0] and done[1] and done[2]:
-            break
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for i in range(max_length):            
 
-    print("Finished")
+            words_len_comb = find_words_lengths(i+1, 2, anagram_length, anagram_length)
+
+            for comb in words_len_comb:
+                threads.append(
+                    executor.submit(find_secret, valid_words_list, comb, i+1, anagram_length, anagram, secrets, 3)
+                )
+
+    print("-" * 50)
+    print("Search complete. Following secrets found:")
+    for key, value in secrets.items():
+        print(f"{key} --> {value}")   
