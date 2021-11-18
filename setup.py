@@ -8,11 +8,11 @@ dev_requires = [
 ]
 
 setup(
-  name='trustpilot-anagram-challenge',
+  name='anagram-solver',
   version='0.0.1',
   author='Piotr Kubicki',
   author_email='pkubicki44@gmail.com',
-  description='Solution for Trustpilot anagram challenge',
+  description='Anagram solver',
   packages=find_packages(),
   include_package_data=True,
   platforms='any',
